@@ -1,0 +1,22 @@
+[
+	{"id": "1",
+	"name": "Tux",
+	"bio": "Beloved Linux mascot"
+	},
+	{"id": "2",
+	"name": "Skipper",
+	"bio": "Small combat squad leader"
+	},
+	{"id": "3",
+	"name": "Lolo",
+	"bio": "Russian adventurer"
+	},
+	{"id": "4",
+	"name": "Gunter",
+	"bio": "The darkest character in Adventure Time"
+	},
+	{"id": "5",
+	"name": "The Penguin",
+	"bio": "Na, na, na, na, na, na, na, na, na, na... The Penguin! "
+	}
+]
