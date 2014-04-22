@@ -1,4 +1,5 @@
 application: penguin-daycare-simulator
+module: default
 version: 1
 runtime: go
 api_version: go1

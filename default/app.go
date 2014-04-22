@@ -30,7 +30,7 @@ var penguins []penguin
 var lastUpdateTime time.Time
 
 // Mutex for goroutine safe operations on penguins array
-var mutex sync.Mutex
+var mutex sync.RWMutex
 
 // DB records
 type penguinEntity struct {
@@ -66,19 +66,23 @@ func loadPenguinsJson() {
 		log.Fatal("Can't parse penguins.json:", err)
 		return
 	}
+	// log.Fatal exits the program.
+	// It's important to exit the program if penguins.json can't be read into penguins slice.
+	// Otherwise you will have errors due to unitialised slice.
 }
 
 // Display a welcome message on app root
 func rootHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, "Hello! This is Penguin Daycare Simulator backend! Number of penguins loaded: ", len(penguins))
+	fmt.Fprintf(w, "Hello! This is Penguin Daycare Simulator backend! Number of penguins loaded: %d", len(penguins))
 }
 
 // Send penguins array to the mobile app with statistics info
 func penguinsHandler(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	mutex.Lock()
-	defer mutex.Unlock()
 	updatePenguinsStatistics(c)
+	// Lock penguins for reading
+	mutex.RLock()
+	defer mutex.RUnlock()
 	p, err := json.Marshal(penguins)
 	if err != nil {
 		c.Errorf("Can't create JSON response: %v", err)
@@ -92,7 +96,9 @@ func updatePenguinsStatistics(c appengine.Context) {
 	if time.Since(lastUpdateTime) <= 10*time.Minute {
 		return
 	}
-
+	// Lock penguins for writing
+	mutex.Lock()
+	defer mutex.Unlock()
 	lastUpdateTime = time.Now()
 	for i, p := range penguins {
 		penguin_db := dbGetPenguin(c, p.Id)
@@ -115,7 +121,11 @@ func visitHandler(w http.ResponseWriter, r *http.Request) {
 		penguin_db := dbGetPenguin(c, penguin_id)
 		penguin_db.VisitCount += 1
 		k := datastore.NewKey(c, "Entity", penguin_id, 0, nil)
-		_, _ = datastore.Put(c, k, &penguin_db)
+		_, err := datastore.Put(c, k, &penguin_db)
+		if err != nil {
+			c.Errorf("Error writing into the datastore: %v", err)
+			return
+		}
 	}
 }
 
@@ -127,7 +137,11 @@ func fishHandler(w http.ResponseWriter, r *http.Request) {
 		penguin_db := dbGetPenguin(c, penguin_id)
 		penguin_db.FishCount += 1
 		k := datastore.NewKey(c, "Entity", penguin_id, 0, nil)
-		_, _ = datastore.Put(c, k, &penguin_db)
+		_, err := datastore.Put(c, k, &penguin_db)
+		if err != nil {
+			c.Errorf("Error writing into the datastore: %v", err)
+			return
+		}
 	}
 }
 
@@ -139,7 +153,11 @@ func bellyrubHandler(w http.ResponseWriter, r *http.Request) {
 		penguin_db := dbGetPenguin(c, penguin_id)
 		penguin_db.BellyrubCount += 1
 		k := datastore.NewKey(c, "Entity", penguin_id, 0, nil)
-		_, _ = datastore.Put(c, k, &penguin_db)
+		_, err := datastore.Put(c, k, &penguin_db)
+		if err != nil {
+			c.Errorf("Error writing into the datastore: %v", err)
+			return
+		}
 	}
 }
 
@@ -148,6 +166,8 @@ func dbGetPenguin(c appengine.Context, id string) penguinEntity {
 	var p penguinEntity
 	k := datastore.NewKey(c, "Entity", id, 0, nil)
 	if err := datastore.Get(c, k, &p); err != nil {
+		// If there is no record in the DB for the requested penguin, return an empty struct
+		// with correct Id for later writing into the DB
 		p.Id = id
 	}
 	return p
@@ -155,6 +175,9 @@ func dbGetPenguin(c appengine.Context, id string) penguinEntity {
 
 // Checks for a valid penguin id
 func penguinExists(id string) bool {
+	// Lock penguins for reading
+	mutex.RLock()
+	defer mutex.RUnlock()
 	result := false
 	for _, p := range penguins {
 		if p.Id == id {

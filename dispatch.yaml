@@ -1,0 +1,8 @@
+application: penguin-daycare-simulator
+
+dispatch:
+- url: "*/favicon.ico"
+  module: static
+
+- url: "*/"
+  module: default
